@@ -1,0 +1,35 @@
+name: Python
+
+on: [push, pull_request]
+
+env:
+  get_poetry: https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Install Poetry
+        run: |
+          curl --location --show-error --silent $get_poetry | python
+          $HOME/.poetry/bin/poetry env use python
+          echo "::set-env name=PATH::$($HOME/.poetry/bin/poetry env info --path)/bin:$HOME/.poetry/bin:$PATH"
+          echo "::set-env name=POETRY_ACTIVE::1"
+          echo "::set-env name=VIRTUAL_ENV::$($HOME/.poetry/bin/poetry env info --path)"
+      - name: Cache dependencies
+        id: pyproject-cache
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.VIRTUAL_ENV }}
+          key: ${{ runner.os }}-${{ env.pythonLocation }}-poetry-${{ hashFiles('**/poetry.lock') }}
+      - name: Install dependencies
+        run: poetry install
+      - name: Lint with pylint
+        run: pylint discofiles.py || echo Ignoring pylint failure

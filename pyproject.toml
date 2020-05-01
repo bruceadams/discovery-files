@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "discovery-files"
+version = "1.1.0"
+description = "A simple tool to send files into Watson Discovery, with simple retry."
+authors = ["Bruce Adams <bruce.adams@acm.org>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+ibm-watson = "^3.2"
+
+[tool.poetry.dev-dependencies]
+black = "^19.10b0"
+mypy = "^0.750"
+pylint = "^2.4.4"
+pytest = "^5.3.2"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
