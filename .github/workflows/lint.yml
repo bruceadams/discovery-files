@@ -33,3 +33,7 @@ jobs:
         run: poetry install
       - name: Lint with pylint
         run: pylint discofiles.py || echo Ignoring pylint failure
+      - name: Check code formatting
+        run: black --check .
+      - name: Lint with mypy
+        run: mypy discofiles.py

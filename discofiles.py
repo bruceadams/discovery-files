@@ -3,22 +3,25 @@
 A simple tool to send files into Watson Discovery, with simple retry.
 """
 
+from __future__ import annotations
+
 import argparse
 import concurrent.futures
 import json
 import os
-import queue
 import sys
 from dataclasses import dataclass
 from hashlib import sha1
 from mimetypes import guess_type
-from typing import Dict, List, Optional, Set, Tuple
+from queue import Queue
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from ibm_watson import DiscoveryV1
 
 CONCURRENCY = 16
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class Args:
     """
@@ -35,7 +38,7 @@ class Args:
     username: Optional[str] = None
     version: str = "2019-09-23"
 
-    def init_from_dict(self, credentials: Dict[str, str]):
+    def init_from_dict(self, credentials: Dict[str, str]) -> None:
         """
         Initialize many instance variables from a dict
         (presumed to have been parsed from JSON).
@@ -86,16 +89,17 @@ def writable_environment_id(discovery: DiscoveryV1) -> str:
     """
     for environment in discovery.list_environments().get_result()["environments"]:
         if not environment["read_only"]:
-            return environment["environment_id"]
+            environment_id: str = environment["environment_id"]
+            return environment_id
     print(
         "Error: no writable environment found. "
         "Please create a bring your own data environment."
     )
-    exit(1)
+    sys.exit(1)
     return ""  # pylint complains! Ha!
 
 
-def pmap(action, input_iterable) -> list:
+def pmap(action: Callable[[Any], Any], input_iterable: Iterable[Any]) -> List[Any]:
     """
     Simple concurrent map function that uses threads.
     Each element in the input list will be processed in its own thread.
@@ -123,7 +127,7 @@ def existing_sha1s(target: Target) -> List[str]:
     alphabet = "0123456789abcdef"  # Hexadecimal digits, lowercase
     chunk_size = 10000
 
-    def maybe_some_sha1s(prefix):
+    def maybe_some_sha1s(prefix: str) -> Union[str, List[str]]:
         """
         A helper function that does the query and returns either:
         1) A list of SHA1 values
@@ -156,7 +160,10 @@ def existing_sha1s(target: Target) -> List[str]:
 
 
 def do_one_file(
-    file_path: str, indexed: Set[str], work_q: queue.Queue, dry_run: bool
+    file_path: str,
+    indexed: Set[str],
+    work_q: Queue[Union[None, Tuple[str, str]]],
+    dry_run: bool,
 ) -> Tuple[int, int]:
     """
     Read a file and conditionally add it to the queue of files to send to Discovery.
@@ -187,7 +194,10 @@ def do_one_file(
 
 
 def walk_paths(
-    paths: List[str], index_list: List[str], work_q: queue.Queue, dry_run: bool
+    paths: List[str],
+    index_list: List[str],
+    work_q: Queue[Union[None, Tuple[str, str]]],
+    dry_run: bool,
 ) -> None:
     """
     Walk through each path given on the command line, handling each file in turn.
@@ -244,11 +254,11 @@ def main(args: Args) -> None:
             print("Error: multiple collections found. Please specify which one to use.")
         else:
             print("Error: no target collection found. Please create a collection.")
-        exit(1)
+        sys.exit(1)
     target = Target(discovery, args.environment_id, args.collection_id)
 
     index_list = existing_sha1s(target)
-    work_q: queue.Queue = queue.Queue(CONCURRENCY)
+    work_q: Queue[Union[None, Tuple[str, str]]] = Queue(CONCURRENCY)
     with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY + 1) as executor:
         executor.submit(walk_paths, args.paths, index_list, work_q, args.dry_run)
         futures = set()
